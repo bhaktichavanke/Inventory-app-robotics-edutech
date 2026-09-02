@@ -8,10 +8,12 @@ import {
 } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
 import { validateInvoiceTotals } from '@/lib/validations'
+import { PRODUCT_CATEGORIES } from '@/lib/categories'
 
 interface ExtractedItem {
   partNo: string
   description: string
+  category: string
   quantity: number
   unitPrice: number
   baseAmount: number
@@ -20,6 +22,7 @@ interface ExtractedItem {
   flags?: {
     partNo?: boolean
     description?: boolean
+    category?: boolean
     quantity?: boolean
     unitPrice?: boolean
     baseAmount?: boolean
@@ -102,6 +105,7 @@ export default function UploadInvoicePage() {
         items: (ext.items || []).map((it: any) => ({
           partNo: it.partNo || '',
           description: it.description || '',
+          category: it.category || 'General',
           quantity: it.quantity || 1,
           unitPrice: it.unitPrice || 0,
           baseAmount: it.baseAmount || 0,
@@ -116,6 +120,13 @@ export default function UploadInvoicePage() {
         toast({ title: 'AI Extraction Notice', description: ext.error, type: 'info' })
       } else {
         toast({ title: 'Invoice Extracted!', description: 'Please review and verify the extracted data below.', type: 'success' })
+      }
+      if (data.storageError) {
+        toast({
+          title: 'Document Not Saved',
+          description: 'Extraction succeeded, but the original file could not be stored — you can still save the invoice without it attached.',
+          type: 'info',
+        })
       }
     } catch (err) {
       toast({ title: 'Upload Failed', description: err instanceof Error ? err.message : 'Unknown error', type: 'error' })
@@ -147,7 +158,7 @@ export default function UploadInvoicePage() {
       ...form,
       items: [
         ...form.items,
-        { partNo: '', description: '', quantity: 1, unitPrice: 0, baseAmount: 0, gstAmount: 0, totalAmount: 0 },
+        { partNo: '', description: '', category: 'General', quantity: 1, unitPrice: 0, baseAmount: 0, gstAmount: 0, totalAmount: 0 },
       ],
     })
   }
@@ -440,8 +451,9 @@ export default function UploadInvoicePage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-600 text-xs border-b">
-                    <th className="p-3">Part No. *</th>
+                    <th className="p-3">Part No. <span className="font-normal text-gray-400">(optional)</span></th>
                     <th className="p-3">Item Description</th>
+                    <th className="p-3 w-36">Category</th>
                     <th className="p-3 w-20">Qty</th>
                     <th className="p-3 w-28">Unit Price</th>
                     <th className="p-3 w-28">Base Amt</th>
@@ -458,7 +470,7 @@ export default function UploadInvoicePage() {
                           type="text"
                           value={item.partNo}
                           onChange={(e) => updateItem(idx, 'partNo', e.target.value)}
-                          placeholder="e.g. MTR-001"
+                          placeholder="e.g. MTR-001 (leave blank if unknown)"
                           className={`w-full p-2 border rounded-lg text-sm ${item.flags?.partNo ? 'bg-amber-50 border-amber-400' : 'border-gray-200'}`}
                         />
                       </td>
@@ -470,6 +482,17 @@ export default function UploadInvoicePage() {
                           placeholder="Description"
                           className="w-full p-2 border border-gray-200 rounded-lg text-sm"
                         />
+                      </td>
+                      <td className="p-2">
+                        <select
+                          value={item.category || 'General'}
+                          onChange={(e) => updateItem(idx, 'category', e.target.value)}
+                          className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-white"
+                        >
+                          {PRODUCT_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="p-2">
                         <input

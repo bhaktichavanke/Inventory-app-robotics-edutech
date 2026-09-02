@@ -146,7 +146,7 @@ export default function InventoryPage() {
                       <td className="p-3 border-r border-slate-200 text-slate-400 text-center font-sans">{idx + 1}</td>
                       <td className="p-3 border-r border-slate-200 font-bold text-blue-700">
                         <a href={`/products/${p.id}`} className="hover:underline">
-                          {p.partNo}
+                          {p.partNo || <span className="text-slate-400 italic font-sans font-normal">no part no.</span>}
                         </a>
                       </td>
                       <td className="p-3 border-r border-slate-200 font-sans font-semibold text-slate-900">{p.description}</td>

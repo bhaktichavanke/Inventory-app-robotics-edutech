@@ -32,12 +32,16 @@ export async function POST(request: NextRequest) {
     // Persist the original file durably (Vercel Blob) so it can be linked to the
     // invoice once the user confirms/saves the extracted data.
     let uploaded: { url: string; fileName: string; fileType: string } | null = null
+    let storageError: string | null = null
     try {
       uploaded = await saveInvoiceFile(buffer, file.name, fileType)
     } catch (uploadErr) {
       console.error('Blob upload failed:', uploadErr)
       // Extraction can still proceed even if the file couldn't be stored —
       // the user will just save the invoice without an attached document.
+      // Surface this to the frontend instead of failing silently, so the
+      // user knows their original document wasn't saved.
+      storageError = uploadErr instanceof Error ? uploadErr.message : 'Unknown storage error'
     }
 
     return NextResponse.json({
@@ -46,6 +50,7 @@ export async function POST(request: NextRequest) {
       tempFileName: uploaded?.fileName || file.name,
       fileType: fileType,
       originalName: file.name,
+      storageError,
     })
   } catch (error) {
     console.error('POST /api/invoices/upload error:', error)

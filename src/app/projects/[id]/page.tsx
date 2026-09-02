@@ -143,7 +143,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <td className="p-4 font-medium text-gray-900">{c.product?.description}</td>
                   <td className="p-4 font-semibold text-blue-600">
                     <Link href={`/products/${c.productId}`} className="hover:underline">
-                      {c.product?.partNo}
+                      {c.product?.partNo || '—'}
                     </Link>
                   </td>
                   <td className="p-4 font-bold text-center text-gray-900">{c.quantityUsed}</td>
@@ -203,7 +203,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       className="p-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between text-sm"
                     >
                       <div>
-                        <p className="font-bold text-gray-900">{p.partNo} — {p.description}</p>
+                        <p className="font-bold text-gray-900">{p.partNo ? `${p.partNo} — ` : ''}{p.description}</p>
                         <p className="text-xs text-gray-400">{p.category || 'General'}</p>
                       </div>
                       <div className="text-right">
@@ -220,7 +220,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <div className="space-y-4">
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                   <div>
-                    <p className="font-bold text-blue-900">{selectedProduct.partNo} — {selectedProduct.description}</p>
+                    <p className="font-bold text-blue-900">{selectedProduct.partNo ? `${selectedProduct.partNo} — ` : ''}{selectedProduct.description}</p>
                     <p className="text-xs text-blue-700">Available Stock: {selectedProduct.currentStock} units</p>
                   </div>
                   <button onClick={() => setSelectedProduct(null)} className="text-xs text-blue-600 hover:underline font-semibold">

@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Package, Search, Download, Plus, AlertTriangle, Eye, Filter } from 'lucide-react'
+import { Package, Search, Download, Plus, AlertTriangle, Eye, Filter, Pencil, Trash2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
+import { PRODUCT_CATEGORIES } from '@/lib/categories'
 
 export default function ProductsPage() {
   const queryClient = useQueryClient()
@@ -13,6 +14,7 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<any | null>(null)
 
   const [newProduct, setNewProduct] = useState({
     partNo: '',
@@ -54,6 +56,52 @@ export default function ProductsPage() {
       toast({ title: 'Error', description: err.message, type: 'error' })
     },
   })
+
+  const updateProductMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const { id, ...rest } = payload
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rest),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update product')
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast({ title: 'Saved', description: 'Product updated successfully.', type: 'success' })
+      setEditingProduct(null)
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Error', description: err.message, type: 'error' })
+    },
+  })
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete product')
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast({ title: 'Deleted', description: 'Product removed from catalog.', type: 'success' })
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Cannot Delete', description: err.message, type: 'error' })
+    },
+  })
+
+  const handleDelete = (p: any) => {
+    if (confirm(`Delete "${p.partNo || p.description}"? This cannot be undone.`)) {
+      deleteProductMutation.mutate(p.id)
+    }
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6 bg-slate-50 min-h-screen">
@@ -149,7 +197,7 @@ export default function ProductsPage() {
                 <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4 font-bold text-blue-600 font-mono">
                     <Link href={`/products/${p.id}`} className="hover:underline">
-                      {p.partNo}
+                      {p.partNo || <span className="text-slate-400 font-sans font-normal italic">no part no.</span>}
                     </Link>
                   </td>
                   <td className="p-4 font-semibold text-slate-900">{p.description}</td>
@@ -175,10 +223,24 @@ export default function ProductsPage() {
                   <td className="p-4 text-slate-600">{p.totalUsed}</td>
                   <td className="p-4 text-slate-800 font-semibold">{formatCurrency(p.unitPrice)}</td>
                   <td className="p-4 text-slate-500 text-xs">{formatDate(p.lastPurchaseDate)}</td>
-                  <td className="p-4 text-right">
-                    <Link href={`/products/${p.id}`} className="p-2 text-slate-400 hover:text-blue-600 inline-block transition-colors">
+                  <td className="p-4 text-right whitespace-nowrap">
+                    <Link href={`/products/${p.id}`} className="p-2 text-slate-400 hover:text-blue-600 inline-block transition-colors" title="View">
                       <Eye className="w-4 h-4" />
                     </Link>
+                    <button
+                      onClick={() => setEditingProduct({ id: p.id, partNo: p.partNo || '', description: p.description, category: p.category || '', supplierName: p.supplier?.name || '', unitPrice: p.unitPrice, lowStockThreshold: p.lowStockThreshold, status: p.status })}
+                      className="p-2 text-slate-400 hover:text-blue-600 inline-block transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p)}
+                      className="p-2 text-slate-400 hover:text-red-600 inline-block transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))
@@ -194,10 +256,10 @@ export default function ProductsPage() {
             <h2 className="text-xl font-extrabold text-slate-900">Add New Product</h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Part No. *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Part No. <span className="font-normal text-slate-400">(optional)</span></label>
                 <input
                   type="text"
-                  placeholder="e.g. MTR-002"
+                  placeholder="e.g. MTR-002 — leave blank if the item has no part number"
                   value={newProduct.partNo}
                   onChange={(e) => setNewProduct({ ...newProduct, partNo: e.target.value })}
                   className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -216,13 +278,16 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
-                  <input
-                    type="text"
-                    placeholder="Motors"
+                  <select
                     value={newProduct.category}
                     onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                    className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                    className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">General</option>
+                    {PRODUCT_CATEGORIES.filter((c) => c !== 'General').map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Supplier</label>
@@ -274,6 +339,103 @@ export default function ProductsPage() {
                 className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm"
               >
                 Create Product
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-xl border border-slate-200">
+            <h2 className="text-xl font-extrabold text-slate-900">Edit Product</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Part No. <span className="font-normal text-slate-400">(optional)</span></label>
+                <input
+                  type="text"
+                  placeholder="Leave blank if the item has no part number"
+                  value={editingProduct.partNo}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, partNo: e.target.value })}
+                  className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Item Description *</label>
+                <input
+                  type="text"
+                  value={editingProduct.description}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                  className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
+                  <select
+                    value={editingProduct.category}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">General</option>
+                    {PRODUCT_CATEGORIES.filter((c) => c !== 'General').map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Supplier</label>
+                  <input
+                    type="text"
+                    value={editingProduct.supplierName}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, supplierName: e.target.value })}
+                    className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Unit Price (₹)</label>
+                  <input
+                    type="number"
+                    value={editingProduct.unitPrice}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, unitPrice: Number(e.target.value) })}
+                    className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Low Stock Limit</label>
+                  <input
+                    type="number"
+                    value={editingProduct.lowStockThreshold}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, lowStockThreshold: Number(e.target.value) })}
+                    className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+                  <select
+                    value={editingProduct.status}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, status: e.target.value })}
+                    className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="DISCONTINUED">Discontinued</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-3 border-t">
+              <button onClick={() => setEditingProduct(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">
+                Cancel
+              </button>
+              <button
+                onClick={() => updateProductMutation.mutate(editingProduct)}
+                disabled={updateProductMutation.isPending}
+                className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm disabled:opacity-50"
+              >
+                Save Changes
               </button>
             </div>
           </div>

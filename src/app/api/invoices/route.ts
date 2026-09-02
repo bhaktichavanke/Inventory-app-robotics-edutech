@@ -1,8 +1,5 @@
 import { prisma } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,16 +105,27 @@ export async function POST(request: NextRequest) {
 
       // Process each item: upsert product, create invoice item, update stock
       for (const item of items) {
-        const { partNo, description, quantity, unitPrice, baseAmount: itemBase, gstAmount: itemGst, totalAmount: itemTotal } = item
+        const { partNo, description, category, quantity, unitPrice, baseAmount: itemBase, gstAmount: itemGst, totalAmount: itemTotal } = item
+        // A part/model number is genuinely optional — many purchased items
+        // (raw materials, generic hardware) never had one on the invoice.
+        // Only attempt to match/dedupe against an existing product when one
+        // was actually provided; otherwise always create a fresh product
+        // record rather than querying `findUnique` with an empty value
+        // (which Prisma rejects) or accidentally colliding two unrelated
+        // blank-part-number items together.
+        const normalizedPartNo = partNo && String(partNo).trim() ? String(partNo).trim() : null
 
         // Find or create product
-        let product = await tx.product.findUnique({ where: { partNo } })
+        let product = normalizedPartNo
+          ? await tx.product.findUnique({ where: { partNo: normalizedPartNo } })
+          : null
 
         if (!product) {
           product = await tx.product.create({
             data: {
-              partNo,
+              partNo: normalizedPartNo,
               description,
+              category: category || null,
               supplierId: resolvedSupplierId || null,
               unitPrice: unitPrice || 0,
               currentStock: quantity,
@@ -134,6 +142,9 @@ export async function POST(request: NextRequest) {
               currentStock: { increment: quantity },
               totalPurchased: { increment: quantity },
               unitPrice: unitPrice || product.unitPrice,
+              // Only backfill category if the product doesn't already have one —
+              // don't let a re-purchase silently overwrite a manually-corrected category.
+              category: product.category || category || product.category,
               lastPurchaseDate: invoiceDate ? new Date(invoiceDate) : new Date(),
               supplierId: resolvedSupplierId || product.supplierId,
             },
@@ -145,7 +156,7 @@ export async function POST(request: NextRequest) {
           data: {
             invoiceId: createdInvoice.id,
             productId: product.id,
-            partNo,
+            partNo: normalizedPartNo,
             description,
             quantity,
             unitPrice: unitPrice || 0,

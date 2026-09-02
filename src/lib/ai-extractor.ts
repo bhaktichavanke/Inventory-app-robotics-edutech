@@ -1,6 +1,9 @@
+import { PRODUCT_CATEGORIES } from './categories'
+
 export interface ExtractedItem {
   partNo: string | null
   description: string | null
+  category: string | null
   quantity: number | null
   unitPrice: number | null
   baseAmount: number | null
@@ -9,6 +12,7 @@ export interface ExtractedItem {
   flags: {
     partNo?: boolean
     description?: boolean
+    category?: boolean
     quantity?: boolean
     unitPrice?: boolean
     baseAmount?: boolean
@@ -43,6 +47,9 @@ export interface ExtractionResult {
   error?: string
 }
 
+// Single source of truth for product categories — imported by both the AI
+// extraction prompt and the frontend forms so the dropdown options and the
+// values the AI is allowed to pick from never drift apart.
 const EXTRACTION_PROMPT = `You are an expert invoice data extractor. Analyze this invoice image/document and extract all information in valid JSON format.
 
 IMPORTANT RULES:
@@ -53,6 +60,8 @@ IMPORTANT RULES:
 5. For dates: return as YYYY-MM-DD format
 6. For quantities: return as numbers
 7. Do NOT guess — return null if you cannot read a value clearly
+8. For each line item's "category", classify it into exactly ONE of these values based on the item description: ${PRODUCT_CATEGORIES.join(', ')}. Use "General" if none of the more specific categories clearly fit — never invent a new category name.
+9. A part/model number ("partNo") may genuinely be absent from the invoice — that's normal, return null rather than guessing one.
 
 Return ONLY this JSON structure (no markdown, no explanation):
 {
@@ -74,6 +83,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
     {
       "partNo": "string or null",
       "description": "string or null",
+      "category": "one of: ${PRODUCT_CATEGORIES.join(', ')}",
       "quantity": number or null,
       "unitPrice": number or null,
       "baseAmount": number or null,
@@ -183,7 +193,16 @@ function parseExtraction(text: string): ExtractionResult {
   parsed.rawText = text
   if (!parsed.items) parsed.items = []
   if (!parsed.flags) parsed.flags = {}
-  parsed.items = parsed.items.map((item) => ({ ...item, flags: item.flags || {} }))
+  parsed.items = parsed.items.map((item) => ({
+    ...item,
+    // Defensive normalization: if the model returns a category outside our
+    // fixed list (hallucination, casing mismatch, etc.), fall back to
+    // "General" rather than letting an unrecognized value into the DB.
+    category: item.category && (PRODUCT_CATEGORIES as readonly string[]).includes(item.category)
+      ? item.category
+      : 'General',
+    flags: item.flags || {},
+  }))
   return parsed
 }
 

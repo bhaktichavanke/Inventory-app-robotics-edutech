@@ -183,10 +183,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <td className="p-4 font-semibold text-blue-600">
                   {item.productId ? (
                     <Link href={`/products/${item.productId}`} className="hover:underline">
-                      {item.partNo}
+                      {item.partNo || '—'}
                     </Link>
                   ) : (
-                    item.partNo
+                    item.partNo || '—'
                   )}
                 </td>
                 <td className="p-4 text-gray-800">{item.description}</td>

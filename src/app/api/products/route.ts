@@ -72,9 +72,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { partNo, description, category, supplierId, supplierName, unitPrice, lowStockThreshold, currentStock, status } = body
 
-    if (!partNo || !description) {
-      return NextResponse.json({ error: 'partNo and description are required' }, { status: 400 })
+    if (!description) {
+      return NextResponse.json({ error: 'Description is required' }, { status: 400 })
     }
+    const normalizedPartNo = partNo && String(partNo).trim() ? String(partNo).trim() : null
 
     // Auto-create supplier if name provided but no ID
     let resolvedSupplierId = supplierId
@@ -87,15 +88,18 @@ export async function POST(request: NextRequest) {
       resolvedSupplierId = supplier.id
     }
 
-    // Check for duplicate
-    const existing = await prisma.product.findUnique({ where: { partNo } })
-    if (existing) {
-      return NextResponse.json({ error: `Product with Part No. "${partNo}" already exists`, existing }, { status: 409 })
+    // Check for duplicate (only meaningful when a part number was given —
+    // multiple products with no part number are allowed to coexist)
+    if (normalizedPartNo) {
+      const existing = await prisma.product.findUnique({ where: { partNo: normalizedPartNo } })
+      if (existing) {
+        return NextResponse.json({ error: `Product with Part No. "${normalizedPartNo}" already exists`, existing }, { status: 409 })
+      }
     }
 
     const product = await prisma.product.create({
       data: {
-        partNo,
+        partNo: normalizedPartNo,
         description,
         category: category || null,
         supplierId: resolvedSupplierId || null,

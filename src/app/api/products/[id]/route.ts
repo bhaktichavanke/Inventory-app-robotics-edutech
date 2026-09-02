@@ -41,7 +41,7 @@ export async function PATCH(
   const { id } = await params
   try {
     const body = await request.json()
-    const { description, category, supplierId, supplierName, unitPrice, lowStockThreshold, status } = body
+    const { partNo, description, category, supplierId, supplierName, unitPrice, lowStockThreshold, status } = body
 
     // Auto-create supplier if needed
     let resolvedSupplierId = supplierId
@@ -54,9 +54,14 @@ export async function PATCH(
       resolvedSupplierId = supplier.id
     }
 
+    const normalizedPartNo = partNo !== undefined
+      ? (partNo && String(partNo).trim() ? String(partNo).trim() : null)
+      : undefined
+
     const product = await prisma.product.update({
       where: { id },
       data: {
+        ...(normalizedPartNo !== undefined && { partNo: normalizedPartNo }),
         ...(description !== undefined && { description }),
         ...(category !== undefined && { category }),
         ...(resolvedSupplierId !== undefined && { supplierId: resolvedSupplierId }),
@@ -69,6 +74,10 @@ export async function PATCH(
 
     return NextResponse.json(product)
   } catch (error) {
+    // P2002 = unique constraint violation (duplicate part number)
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Another product already uses that Part No.' }, { status: 409 })
+    }
     console.error('PATCH /api/products/[id] error:', error)
     return NextResponse.json({ error: 'Failed to update product' }, { status: 500 })
   }
@@ -83,6 +92,20 @@ export async function DELETE(
     await prisma.product.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
+    // P2003 = foreign key constraint failed — this product still has
+    // purchase history, project usage, or invoice items pointing at it.
+    // Deleting the product would silently orphan or corrupt those records,
+    // so we block it and explain why rather than surfacing a raw DB error.
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
+      return NextResponse.json(
+        {
+          error:
+            'This product has purchase or project-usage history and can\'t be deleted. ' +
+            'Delete its related invoices/project components first, or set its status to "Discontinued" instead.',
+        },
+        { status: 409 }
+      )
+    }
     console.error('DELETE /api/products/[id] error:', error)
     return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 })
   }

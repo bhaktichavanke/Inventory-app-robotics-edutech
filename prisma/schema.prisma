@@ -28,7 +28,10 @@ model Supplier {
 
 model Product {
   id                String    @id @default(cuid())
-  partNo            String    @unique
+  // Optional: some purchased parts arrive without a manufacturer/vendor part
+  // number. Nullable + @unique is safe in Postgres — the unique index allows
+  // any number of NULLs, so multiple no-part-number products can coexist.
+  partNo            String?   @unique
   description       String
   category          String?
   supplierId        String?
@@ -81,7 +84,7 @@ model InvoiceItem {
   id          String   @id @default(cuid())
   invoiceId   String
   productId   String?
-  partNo      String
+  partNo      String?
   description String
   quantity    Float
   unitPrice   Float    @default(0)
@@ -119,7 +122,10 @@ model ProjectComponent {
 
   project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   product Product  @relation(fields: [productId], references: [id])
-  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+  // If the source invoice is later deleted, keep this usage record but drop
+  // the dangling reference instead of blocking the invoice delete outright
+  // (invoiceId is optional, so this is safe).
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 }
 
 model PurchaseHistory {
