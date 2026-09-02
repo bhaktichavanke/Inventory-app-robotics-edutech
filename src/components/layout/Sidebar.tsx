@@ -13,9 +13,11 @@ import {
   ChevronRight,
   Upload,
   Layers,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,7 +31,14 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <aside
@@ -76,6 +85,21 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Logout */}
+      <div className={cn('px-3 pb-2', collapsed && 'flex justify-center')}>
+        <button
+          onClick={handleLogout}
+          className={cn(
+            'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-900 hover:text-red-400 transition-all w-full',
+            collapsed && 'justify-center px-0 w-auto'
+          )}
+          title={collapsed ? 'Log out' : undefined}
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>Log out</span>}
+        </button>
+      </div>
 
       {/* Toggle Collapse Button */}
       <button

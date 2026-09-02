@@ -22,6 +22,7 @@ invoice extraction (Google Gemini — free tier), built with Next.js (App Router
    - `DATABASE_URL` / `DIRECT_URL` — a PostgreSQL database (see [Database setup](#database-setup))
    - `BLOB_READ_WRITE_TOKEN` — a Vercel Blob token (see [File storage setup](#file-storage-setup))
    - `GEMINI_API_KEY` — optional; without it, invoice upload still works but skips AI auto-extraction. Get a free key at https://aistudio.google.com/apikey
+   - `APP_PASSWORD` — **strongly recommended**; without it the app has no login screen at all and anyone with the URL can view/edit everything (see [Access control](#access-control))
 
 3. **Push the schema and seed sample data**
    ```bash
@@ -34,6 +35,20 @@ invoice extraction (Google Gemini — free tier), built with Next.js (App Router
    npm run dev
    ```
    Open http://localhost:3000
+
+## Access control
+
+The app has one shared password for the whole team (not per-user accounts) —
+set `APP_PASSWORD` and everyone sees a login screen before anything else.
+**If `APP_PASSWORD` is unset, the app has no login gate at all** — fine for
+local development, not fine for a deployed URL people outside your team
+could stumble onto. Set it in Vercel's Environment Variables before sharing
+the deployed link.
+
+A separate `AUTH_SECRET` (random string) is used to sign the login session
+cookie; if you skip it, `APP_PASSWORD` is reused for signing, which still
+works but means changing the password logs everyone out immediately (usually
+fine for a small team).
 
 ## Database setup
 
@@ -64,7 +79,8 @@ regenerate it — the key steps are:
 3. Add the **Neon** integration (Storage tab) → auto-fills `DATABASE_URL` / `DIRECT_URL` / etc.
 4. Add a **Blob store** (Storage tab) → auto-fills `BLOB_READ_WRITE_TOKEN`.
 5. Add `GEMINI_API_KEY` manually (Settings → Environment Variables) — get a free key at aistudio.google.com/apikey.
-6. Deploy. Vercel runs `prisma generate && prisma db push && next build` automatically.
+6. Add `APP_PASSWORD` (and optionally `AUTH_SECRET`) manually — see [Access control](#access-control). Skipping this leaves the deployed app open to anyone with the URL.
+7. Deploy. Vercel runs `prisma generate && prisma db push && next build` automatically.
 
 ## Project structure
 
