@@ -107,12 +107,36 @@ model Project {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // Components used directly on the project (no sub-part), plus each
+  // sub-part below has its own component list.
+  components ProjectComponent[]
+  subTasks   ProjectSubTask[]
+}
+
+// A part/sub-assembly of a project (e.g. an "Articulated Arm" project might
+// have sub-tasks "Base", "Joint 1", "Gripper"), each of which consumes its
+// own set of products. One level deep only — not recursive/nested
+// sub-sub-tasks, which would add real complexity for a benefit that doesn't
+// fit an inventory tool.
+model ProjectSubTask {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  status    String   @default("PENDING") // PENDING | IN_PROGRESS | DONE
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   components ProjectComponent[]
 }
 
 model ProjectComponent {
   id           String   @id @default(cuid())
   projectId    String
+  // Optional: when set, this usage belongs to a specific sub-part of the
+  // project rather than the project as a whole.
+  subTaskId    String?
   productId    String
   invoiceId    String?
   quantityUsed Float
@@ -120,7 +144,8 @@ model ProjectComponent {
   notes        String?
   createdAt    DateTime @default(now())
 
-  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subTask ProjectSubTask? @relation(fields: [subTaskId], references: [id], onDelete: Cascade)
   product Product  @relation(fields: [productId], references: [id])
   // If the source invoice is later deleted, keep this usage record but drop
   // the dangling reference instead of blocking the invoice delete outright

@@ -11,7 +11,7 @@ export async function POST(
   const { id: projectId } = await params
   try {
     const body = await request.json()
-    const { productId, invoiceId, quantityUsed, dateUsed, notes } = body
+    const { productId, invoiceId, subTaskId, quantityUsed, dateUsed, notes } = body
 
     if (!productId || !quantityUsed || quantityUsed <= 0) {
       return NextResponse.json({ error: 'productId and quantityUsed > 0 are required' }, { status: 400 })
@@ -28,10 +28,18 @@ export async function POST(
       }, { status: 400 })
     }
 
+    if (subTaskId) {
+      const subTask = await prisma.projectSubTask.findUnique({ where: { id: subTaskId } })
+      if (!subTask || subTask.projectId !== projectId) {
+        return NextResponse.json({ error: 'Sub-task not found on this project' }, { status: 404 })
+      }
+    }
+
     const component = await prisma.$transaction(async (tx) => {
       const comp = await tx.projectComponent.create({
         data: {
           projectId,
+          subTaskId: subTaskId || null,
           productId,
           invoiceId: invoiceId || null,
           quantityUsed,

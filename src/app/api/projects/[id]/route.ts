@@ -13,8 +13,18 @@ export async function GET(
       where: { id },
       include: {
         components: {
+          where: { subTaskId: null },
           include: { product: { include: { supplier: true } }, invoice: true },
           orderBy: { dateUsed: 'desc' },
+        },
+        subTasks: {
+          include: {
+            components: {
+              include: { product: { include: { supplier: true } }, invoice: true },
+              orderBy: { dateUsed: 'desc' },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
         },
       },
     })
