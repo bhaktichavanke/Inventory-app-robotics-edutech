@@ -36,7 +36,7 @@ export async function PATCH(
   const { id } = await params
   try {
     const body = await request.json()
-    const allowed = ['poNumber', 'invoiceDate', 'baseAmount', 'gstAmount', 'cgst', 'sgst', 'igst', 'otherTax', 'totalAmount', 'receivedDate', 'status', 'notes']
+    const allowed = ['poNumber', 'invoiceDate', 'baseAmount', 'gstAmount', 'cgst', 'sgst', 'igst', 'otherTax', 'totalAmount', 'receivedDate', 'status', 'notes', 'accountNumber', 'accountName']
 
     const updateData: Record<string, unknown> = {}
     for (const key of allowed) {

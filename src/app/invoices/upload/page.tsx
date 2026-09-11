@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Upload, FileText, AlertTriangle, CheckCircle2, Plus, Trash2, 
@@ -37,6 +37,8 @@ interface ExtractionFormState {
   invoiceDate: string
   receivedDate: string
   status: 'RECEIVED' | 'NOT_RECEIVED'
+  accountNumber: string
+  accountName: string
   baseAmount: number
   gstAmount: number
   cgst: number
@@ -55,8 +57,18 @@ export default function UploadInvoicePage() {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [tempFileInfo, setTempFileInfo] = useState<{ tempFilePath: string; tempFileName: string; fileType: string } | null>(null)
+  const [knownAccounts, setKnownAccounts] = useState<{ accountName: string | null; accountNumber: string | null }[]>([])
 
   const [form, setForm] = useState<ExtractionFormState | null>(null)
+
+  // Load previously-used purchase accounts once, for the autocomplete
+  // datalist below — they only have 2-3 accounts, so this saves retyping.
+  useEffect(() => {
+    fetch('/api/invoices/accounts')
+      .then((r) => r.json())
+      .then((d) => setKnownAccounts(d.accounts || []))
+      .catch(() => {})
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -95,6 +107,8 @@ export default function UploadInvoicePage() {
         invoiceDate: ext.invoiceDate || new Date().toISOString().split('T')[0],
         receivedDate: '', // Leave blank by default per requirement
         status: 'NOT_RECEIVED',
+        accountNumber: '',
+        accountName: '',
         baseAmount: ext.baseAmount || 0,
         gstAmount: ext.gstAmount || 0,
         cgst: ext.cgst || 0,
@@ -347,6 +361,36 @@ export default function UploadInvoicePage() {
                   onChange={(e) => setForm({ ...form, receivedDate: e.target.value })}
                   className="w-full p-2.5 text-sm border border-gray-300 rounded-lg"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Purchase Account No.</label>
+                <input
+                  type="text"
+                  list="known-account-numbers"
+                  value={form.accountNumber}
+                  onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
+                  className="w-full p-2.5 text-sm border border-gray-300 rounded-lg"
+                  placeholder="e.g. XXXX1234"
+                />
+                <datalist id="known-account-numbers">
+                  {knownAccounts.map((a, i) => a.accountNumber && <option key={i} value={a.accountNumber} />)}
+                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Purchase Account Name</label>
+                <input
+                  type="text"
+                  list="known-account-names"
+                  value={form.accountName}
+                  onChange={(e) => setForm({ ...form, accountName: e.target.value })}
+                  className="w-full p-2.5 text-sm border border-gray-300 rounded-lg"
+                  placeholder="e.g. HDFC Current A/c"
+                />
+                <datalist id="known-account-names">
+                  {knownAccounts.map((a, i) => a.accountName && <option key={i} value={a.accountName} />)}
+                </datalist>
               </div>
 
               <div>

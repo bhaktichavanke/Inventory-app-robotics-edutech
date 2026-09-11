@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       invoiceNo, poNumber, supplierId, supplierName, invoiceDate,
       baseAmount, gstAmount, cgst, sgst, igst, otherTax, totalAmount,
       receivedDate, status, notes, items, filePath, fileType, fileName,
+      accountNumber, accountName,
     } = body
 
     if (!invoiceNo) {
@@ -100,6 +101,8 @@ export async function POST(request: NextRequest) {
           fileType: fileType || null,
           fileName: fileName || null,
           notes: notes || null,
+          accountNumber: accountNumber || null,
+          accountName: accountName || null,
         },
       })
 
@@ -120,6 +123,13 @@ export async function POST(request: NextRequest) {
           ? await tx.product.findUnique({ where: { partNo: normalizedPartNo } })
           : null
 
+        // No existing product matched (either no part number was given, or
+        // the given one doesn't exist yet) — a new product gets created so
+        // stock still tracks correctly right away, but the item is flagged
+        // AUTO_CREATED so an admin can review it: confirm it's genuinely
+        // new, or map it onto an existing product if this was actually a
+        // duplicate (misspelling, missing part number, etc).
+        const isNewMatch = !product
         if (!product) {
           product = await tx.product.create({
             data: {
@@ -163,6 +173,7 @@ export async function POST(request: NextRequest) {
             baseAmount: itemBase || 0,
             gstAmount: itemGst || 0,
             totalAmount: itemTotal || 0,
+            matchStatus: isNewMatch ? 'AUTO_CREATED' : 'MATCHED',
           },
         })
 

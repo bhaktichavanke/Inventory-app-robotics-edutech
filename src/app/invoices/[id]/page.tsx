@@ -4,7 +4,7 @@ import { use, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, FileText, CheckCircle, Clock, Trash2, ExternalLink, Calendar, DollarSign, Package } from 'lucide-react'
+import { ArrowLeft, FileText, CheckCircle, Clock, Trash2, ExternalLink, Calendar, DollarSign, Package, AlertTriangle, Search } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
 
@@ -12,6 +12,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params)
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [resolvingItem, setResolvingItem] = useState<any>(null)
+  const [productSearch, setProductSearch] = useState('')
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -44,6 +46,33 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       toast({ title: 'Deleted', description: 'Invoice deleted and stock reversed.', type: 'info' })
       router.push('/invoices')
     },
+  })
+
+  const { data: searchResults } = useQuery({
+    queryKey: ['products-search-resolve', productSearch],
+    queryFn: () => fetch(`/api/products?search=${encodeURIComponent(productSearch)}`).then((r) => r.json()),
+    enabled: !!resolvingItem,
+  })
+
+  const resolveMutation = useMutation({
+    mutationFn: async (payload: { itemId: string; action: string; productId?: string }) => {
+      const res = await fetch(`/api/invoices/${id}/items/${payload.itemId}/resolve`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: payload.action, productId: payload.productId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to resolve item')
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast({ title: 'Resolved', description: 'Invoice item updated.', type: 'success' })
+      setResolvingItem(null)
+      setProductSearch('')
+    },
+    onError: (err: Error) => toast({ title: 'Error', description: err.message, type: 'error' }),
   })
 
   if (isLoading) return <div className="p-8 text-gray-500">Loading invoice...</div>
@@ -128,6 +157,33 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 {formatCurrency(inv.cgst + inv.sgst + inv.igst + inv.otherTax)}
               </p>
             </div>
+            <div>
+              <p className="text-xs text-gray-400">Purchase Account</p>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  defaultValue={inv.accountName || ''}
+                  placeholder="Account name"
+                  onBlur={(e) => {
+                    if (e.target.value !== (inv.accountName || '')) {
+                      updateMutation.mutate({ accountName: e.target.value || null })
+                    }
+                  }}
+                  className="p-1 text-xs border border-gray-300 rounded font-medium text-gray-800 w-1/2"
+                />
+                <input
+                  type="text"
+                  defaultValue={inv.accountNumber || ''}
+                  placeholder="Account no."
+                  onBlur={(e) => {
+                    if (e.target.value !== (inv.accountNumber || '')) {
+                      updateMutation.mutate({ accountNumber: e.target.value || null })
+                    }
+                  }}
+                  className="p-1 text-xs border border-gray-300 rounded font-medium text-gray-800 w-1/2 font-mono"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -164,6 +220,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="p-4 border-b bg-gray-50/50 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Purchased Products ({inv.items?.length || 0})</h2>
+          {inv.items?.some((it: any) => it.matchStatus === 'AUTO_CREATED') && (
+            <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5" /> Some items need review
+            </span>
+          )}
         </div>
         <table className="w-full text-left text-sm">
           <thead>
@@ -175,11 +236,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <th className="p-4">Base Amount</th>
               <th className="p-4">GST</th>
               <th className="p-4">Total Amount</th>
+              <th className="p-4">Match</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {inv.items?.map((item: any) => (
-              <tr key={item.id} className="hover:bg-gray-50/60">
+              <tr key={item.id} className={item.matchStatus === 'AUTO_CREATED' ? 'bg-amber-50/50 hover:bg-amber-50' : 'hover:bg-gray-50/60'}>
                 <td className="p-4 font-semibold text-blue-600">
                   {item.productId ? (
                     <Link href={`/products/${item.productId}`} className="hover:underline">
@@ -195,11 +257,91 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <td className="p-4 text-gray-700">{formatCurrency(item.baseAmount)}</td>
                 <td className="p-4 text-gray-700">{formatCurrency(item.gstAmount)}</td>
                 <td className="p-4 font-bold text-gray-900">{formatCurrency(item.totalAmount)}</td>
+                <td className="p-4">
+                  {item.matchStatus === 'AUTO_CREATED' ? (
+                    <button
+                      onClick={() => setResolvingItem(item)}
+                      className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-full"
+                      title="No existing product matched this item — review it"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" /> Review
+                    </button>
+                  ) : (
+                    <span className="text-xs text-green-700 bg-green-50 px-2.5 py-1 rounded-full font-medium">Matched</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Resolve flagged item modal */}
+      {resolvingItem && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-xl max-h-[85vh] overflow-y-auto">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Review Unmatched Item</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                &ldquo;{resolvingItem.description}&rdquo; didn&apos;t match any existing product by part number, so a
+                new product was created automatically. Confirm it&apos;s genuinely new, or map it to an existing
+                product if this was a duplicate/mismatch.
+              </p>
+            </div>
+
+            <button
+              onClick={() => resolveMutation.mutate({ itemId: resolvingItem.id, action: 'confirm_new' })}
+              disabled={resolveMutation.isPending}
+              className="w-full text-left p-3 border border-green-200 bg-green-50 rounded-lg hover:bg-green-100 text-sm font-semibold text-green-800"
+            >
+              ✓ This is genuinely a new product — keep it as is
+            </button>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-700 mb-2">— or map it to an existing product instead —</p>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search Part No or Description..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div className="max-h-48 overflow-y-auto divide-y border rounded-lg mt-2">
+                {searchResults?.products
+                  ?.filter((p: any) => p.id !== resolvingItem.productId)
+                  .map((p: any) => (
+                    <button
+                      key={p.id}
+                      onClick={() => resolveMutation.mutate({ itemId: resolvingItem.id, action: 'map_to_existing', productId: p.id })}
+                      disabled={resolveMutation.isPending}
+                      className="w-full text-left p-3 hover:bg-blue-50 text-sm flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="font-bold text-gray-900">{p.partNo ? `${p.partNo} — ` : ''}{p.description}</p>
+                        <p className="text-xs text-gray-400">{p.category || 'General'} · Current Stock: {p.currentStock}</p>
+                      </div>
+                    </button>
+                  ))}
+                {productSearch && searchResults?.products?.length === 0 && (
+                  <p className="p-3 text-xs text-gray-400 text-center">No matching products found.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => { setResolvingItem(null); setProductSearch('') }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

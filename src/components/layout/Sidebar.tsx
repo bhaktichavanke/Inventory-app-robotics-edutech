@@ -14,6 +14,7 @@ import {
   Upload,
   Layers,
   LogOut,
+  Wrench,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/invoices/upload', label: 'Upload Invoice', icon: Upload, highlight: true },
   { href: '/products', label: 'Product Master', icon: Package },
   { href: '/inventory', label: 'Inventory', icon: Boxes },
+  { href: '/assets', label: 'Assets', icon: Wrench },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]

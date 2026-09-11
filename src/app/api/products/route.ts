@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
     }
     if (category) where.category = category
     if (status) where.status = status
+    const componentStatus = searchParams.get('componentStatus') || ''
+    if (componentStatus) where.componentStatus = componentStatus
 
     // Postgres doesn't support comparing two columns of the same row inside a
     // `where` filter without a raw query, so low-stock filtering is applied
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { partNo, description, category, supplierId, supplierName, unitPrice, lowStockThreshold, currentStock, status } = body
+    const { partNo, description, category, supplierId, supplierName, unitPrice, lowStockThreshold, currentStock, status, componentStatus, assignedTo, refundable, ecommerceAllocated } = body
 
     if (!description) {
       return NextResponse.json({ error: 'Description is required' }, { status: 400 })
@@ -108,6 +110,10 @@ export async function POST(request: NextRequest) {
         currentStock: currentStock || 0,
         totalPurchased: currentStock || 0,
         status: status || 'ACTIVE',
+        componentStatus: componentStatus || 'AVAILABLE_STOCK',
+        assignedTo: assignedTo || null,
+        refundable: !!refundable,
+        ecommerceAllocated: ecommerceAllocated || 0,
       },
       include: { supplier: true },
     })

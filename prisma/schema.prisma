@@ -42,6 +42,18 @@ model Product {
   lastPurchaseDate  DateTime?
   lowStockThreshold Float     @default(5)
   status            String    @default("ACTIVE")
+  // Physical stock/lifecycle state — distinct from `status` above (which is
+  // catalog ACTIVE/DISCONTINUED). Options in src/lib/componentStatus.ts.
+  componentStatus   String    @default("AVAILABLE_STOCK")
+  // Free text: which team/person currently holds this if borrowed/assigned.
+  assignedTo        String?
+  // Whether a borrowed/loaned-out unit is expected back.
+  refundable        Boolean   @default(false)
+  // How much of currentStock is earmarked for sale (e.g. via Shopify)
+  // rather than available for internal/project use. Available-for-use is
+  // computed as currentStock - ecommerceAllocated, not stored separately,
+  // so it never drifts out of sync.
+  ecommerceAllocated Float    @default(0)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -71,6 +83,12 @@ model Invoice {
   fileType     String?
   fileName     String?
   notes        String?
+  // Which of the company's purchasing accounts this invoice was paid from
+  // (they use 2-3). Free text rather than a hard enum/table — small enough
+  // list that a datalist autocomplete on the form is enough, no separate
+  // accounts management screen needed.
+  accountNumber String?
+  accountName   String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -91,6 +109,14 @@ model InvoiceItem {
   baseAmount  Float    @default(0)
   gstAmount   Float    @default(0)
   totalAmount Float    @default(0)
+  // MATCHED: found an existing product by exact part number.
+  // AUTO_CREATED: no match was found, so a brand new product was created
+  // automatically — flagged for admin review, since this could be a
+  // genuinely new part OR a duplicate caused by a misspelling/missing
+  // part number.
+  // CONFIRMED_NEW: admin reviewed an AUTO_CREATED item and confirmed it's
+  // really a new product — flag cleared, no data changes.
+  matchStatus String   @default("MATCHED")
   createdAt   DateTime @default(now())
 
   invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -185,4 +211,23 @@ model AppSettings {
   lowStockThreshold Float    @default(5)
   currency          String   @default("INR")
   updatedAt         DateTime @updatedAt
+}
+
+// Company-owned tools/equipment (multimeters, drills, etc.) — distinct from
+// Product, which is consumable/resellable component stock. Assets aren't
+// purchased-and-consumed the same way: they're tracked as individual owned
+// items with a status and (optionally) who's holding them.
+model Asset {
+  id            String    @id @default(cuid())
+  name          String
+  category      String?
+  serialNumber  String?   @unique
+  status        String    @default("AVAILABLE_STOCK") // see src/lib/componentStatus.ts
+  assignedTo    String?
+  refundable    Boolean   @default(false)
+  purchaseDate  DateTime?
+  purchasePrice Float?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

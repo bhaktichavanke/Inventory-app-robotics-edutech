@@ -41,7 +41,7 @@ export async function PATCH(
   const { id } = await params
   try {
     const body = await request.json()
-    const { partNo, description, category, supplierId, supplierName, unitPrice, lowStockThreshold, status } = body
+    const { partNo, description, category, supplierId, supplierName, unitPrice, lowStockThreshold, status, componentStatus, assignedTo, refundable, ecommerceAllocated } = body
 
     // Auto-create supplier if needed
     let resolvedSupplierId = supplierId
@@ -68,6 +68,10 @@ export async function PATCH(
         ...(unitPrice !== undefined && { unitPrice }),
         ...(lowStockThreshold !== undefined && { lowStockThreshold }),
         ...(status !== undefined && { status }),
+        ...(componentStatus !== undefined && { componentStatus }),
+        ...(assignedTo !== undefined && { assignedTo: assignedTo || null }),
+        ...(refundable !== undefined && { refundable: !!refundable }),
+        ...(ecommerceAllocated !== undefined && { ecommerceAllocated }),
       },
       include: { supplier: true },
     })

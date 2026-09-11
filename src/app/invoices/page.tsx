@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { FileText, Search, Download, Upload, CheckCircle, Clock, Eye, Sparkles } from 'lucide-react'
+import { FileText, Search, Download, Upload, CheckCircle, Clock, Eye, Sparkles, AlertTriangle } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
 
@@ -99,6 +99,7 @@ export default function InvoicesPage() {
               <th className="p-4">Invoice No</th>
               <th className="p-4">PO Number</th>
               <th className="p-4">Supplier</th>
+              <th className="p-4">Account</th>
               <th className="p-4">Invoice Date</th>
               <th className="p-4">Total Amount</th>
               <th className="p-4">Status</th>
@@ -109,22 +110,38 @@ export default function InvoicesPage() {
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-slate-400">Loading invoices...</td>
+                <td colSpan={9} className="p-8 text-center text-slate-400">Loading invoices...</td>
               </tr>
             ) : data?.invoices?.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-slate-400">No invoices found.</td>
+                <td colSpan={9} className="p-8 text-center text-slate-400">No invoices found.</td>
               </tr>
             ) : (
-              data?.invoices?.map((inv: any) => (
+              data?.invoices?.map((inv: any) => {
+                const hasFlagged = inv.items?.some((it: any) => it.matchStatus === 'AUTO_CREATED')
+                return (
                 <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4 font-bold text-slate-900 font-mono">
-                    <Link href={`/invoices/${inv.id}`} className="hover:text-blue-600">
+                    <Link href={`/invoices/${inv.id}`} className="hover:text-blue-600 flex items-center gap-1.5">
                       {inv.invoiceNo}
+                      {hasFlagged && (
+                        <span title="Has unmatched items needing review">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                        </span>
+                      )}
                     </Link>
                   </td>
                   <td className="p-4 text-slate-600 font-mono">{inv.poNumber || '—'}</td>
                   <td className="p-4 text-slate-800 font-semibold">{inv.supplier?.name || '—'}</td>
+                  <td className="p-4 text-slate-600 text-xs">
+                    {inv.accountName || inv.accountNumber ? (
+                      <>
+                        {inv.accountName}
+                        {inv.accountName && inv.accountNumber && <br />}
+                        {inv.accountNumber && <span className="font-mono text-slate-400">{inv.accountNumber}</span>}
+                      </>
+                    ) : '—'}
+                  </td>
                   <td className="p-4 text-slate-600">{formatDate(inv.invoiceDate)}</td>
                   <td className="p-4 font-extrabold text-slate-900">{formatCurrency(inv.totalAmount)}</td>
                   <td className="p-4">
@@ -169,7 +186,8 @@ export default function InvoicesPage() {
                     </Link>
                   </td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>
