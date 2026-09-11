@@ -201,7 +201,8 @@ export default function ProductsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
@@ -216,7 +217,7 @@ export default function ProductsPage() {
               <th className="p-4">Total Used</th>
               <th className="p-4">Unit Price</th>
               <th className="p-4">Last Purchase Date</th>
-              <th className="p-4 text-right">Actions</th>
+              <th className="p-4 text-right sticky right-0 bg-slate-50 z-10">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -284,7 +285,7 @@ export default function ProductsPage() {
                   <td className="p-4 text-slate-600">{p.totalUsed}</td>
                   <td className="p-4 text-slate-800 font-semibold">{formatCurrency(p.unitPrice)}</td>
                   <td className="p-4 text-slate-500 text-xs">{formatDate(p.lastPurchaseDate)}</td>
-                  <td className="p-4 text-right whitespace-nowrap">
+                  <td className="p-4 text-right whitespace-nowrap sticky right-0 bg-white">
                     <Link href={`/products/${p.id}`} className="p-2 text-slate-400 hover:text-blue-600 inline-block transition-colors" title="View">
                       <Eye className="w-4 h-4" />
                     </Link>
@@ -308,6 +309,7 @@ export default function ProductsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Add Product Modal */}
